@@ -39,8 +39,7 @@ def fuzz(payloads, target):
     for p in payloads:
         res = requests.get(target.replace("FUZZ", p), headers={"User-Agent":"Mozilla/5.0 (platform; rv:geckoversion) Gecko/geckotrail Firefox/firefoxversion"})
         responses.append(summarize_response(res))
-    for r in responses:
-
+    #for r in responses:
     return responses
 
 def read_payloads(aux_server="https://eop3vd9wn2wdnv1.m.pipedream.net"):# https://eop3vd9wn2wdnv1.m.pipedream.net is mine
