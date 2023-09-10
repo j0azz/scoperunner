@@ -8,6 +8,7 @@ with <3 from j0azz
 
 import subprocess
 import sys
+import requests
 
 # def get_stage_command(stage, scope)
 #     commands = ["ffuf -w /usr/share/wordlists/dirbuster/  -u "+url+" -fc 404"]
@@ -26,7 +27,22 @@ import sys
 #             for s in _stages:
 #                 get_stage_command(s, u)
 #     _stages = stages.split(" ")[:-1]
-    
+def validate_vulnerability(vuln="*", ):
+    pass
+def summarize_response(response):
+    res = {"status":response.status_code, "content":response.text, "headers":response.headers}
+
+def fuzz(payloads, target):
+    print("Target: ", target, "\n")
+    responses = []
+    methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"]
+    for p in payloads:
+        res = requests.get(target.replace("FUZZ", p), headers={"User-Agent":"Mozilla/5.0 (platform; rv:geckoversion) Gecko/geckotrail Firefox/firefoxversion"})
+        responses.append(summarize_response(res))
+    for r in responses:
+
+    return responses
+
 def read_payloads(aux_server="https://eop3vd9wn2wdnv1.m.pipedream.net"):# https://eop3vd9wn2wdnv1.m.pipedream.net is mine
     f = open("payloads", "r")
     content = f.read()
@@ -73,7 +89,7 @@ A tool developed to help automating some initial steps of vulnerability assessme
 
 with <3 from j0azz
 ''')
-print("\n\tUsage: python scoperunner.py [resume, resume2, ...]\nwhere 'scope' is a file on the same path containing a list of URLs.\nonly use resume when you already have a selected-urls.txt file.\nonly use resume2 when you already have a refined-scope.txt file.\n\n")
+print("\n\tUsage: python scoperunner.py [resume, resume2, -nuclei]\nwhere 'scope' is a file on the same path containing a list of URLs.\nonly use resume when you already have a selected-urls.txt file.\nonly use resume2 when you already have a refined-scope.txt file.\n\n")
 resume = False
 resume2 = False
 nuclei_enabled = "-nuclei" in sys.argv
@@ -84,7 +100,7 @@ elif(sys.argv[1]=="resume"):
     print("Resume enabled.\n starting from a ready to use selected-urls.txt file.\n\n ")
     resume = True
 elif(sys.argv[1]=="resume2"):
-    print("Resume enabled.\n starting from a ready to use refined-scope.txt file.\n\n ")
+    print("Resume enabled.\n starting from a ready to use refined-scope.txt file.\n\n ") 
     resume = True
     resume2 = True
 if(not resume):
@@ -146,13 +162,13 @@ if(not resume2):
         except Exception as e:
             print("A problem occured while creating refined-scope.txt file.", e)
             sys.exit(1)
-menu_wl=""
-wordlists = wordlists_index()
-for w in wordlists:
-    menu_wl+=(w+"\n")
+# menu_wl=""
+# wordlists = wordlists_index()
+# for w in wordlists:
+#     menu_wl+=(w+"\n")
         
 print("Proceeding to scan. . .\n\n")
-c = input("Press: \nw\tto change wordlists to be used on discovery mode\np\tto reload payload set from file\nq\tto quit\n[Enter]\tto proceed with the scan.")
+c = input("Press: \nw\tto change wordlists to be used on discovery mode\np\tto reload payload set from file\nq\tto quit\n[Enter]\tto proceed with the scan.\n\n>>> ")
 if(c=="w"):
     pass
 elif(c=="p"):
@@ -164,7 +180,11 @@ else:
         print("\nRunning nuclei on refined scope. . .\n")
         print(subprocess.check_output("nuclei -l refined-scope.txt -v -t cves/ -t exposures/ -severity critical,high -headless".split()))
     print("Fuzzing selected URLs. . . \n")
-
+    for p in default_payloads:
+        print("Payloads of category\t",p)
+        for url in extracted:
+            print("\n\n")
+            print(fuzz(p, url))
 
         
 '''
