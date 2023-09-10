@@ -152,18 +152,18 @@ for w in wordlists:
     menu_wl+=(w+"\n")
         
 print("Proceeding to scan. . .\n\n")
-
-if(nuclei_enabled):
-    print("\nRunning nuclei. . .\n")
-    print(subprocess.check_output("nuclei -l refined-scope.txt -v -t cves/ -t exposures/ -severity critical,high -headless".split()))
-print("Fuzzing selected URLs. . . \n")
-
-
-print(wordlists)
-# for u in extracted:
-#     for w in wordlists:
-#         print(u, w)
-
+c = input("Press: \nw\tto change wordlists to be used on discovery mode\np\tto reload payload set from file\nq\tto quit\n[Enter]\tto proceed with the scan.")
+if(c=="w"):
+    pass
+elif(c=="p"):
+    pass
+elif(c=="q"):
+    sys.exit(1)
+else:
+    if(nuclei_enabled):
+        print("\nRunning nuclei on refined scope. . .\n")
+        print(subprocess.check_output("nuclei -l refined-scope.txt -v -t cves/ -t exposures/ -severity critical,high -headless".split()))
+    print("Fuzzing selected URLs. . . \n")
 
 
         
