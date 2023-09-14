@@ -29,17 +29,18 @@ import requests
 #     _stages = stages.split(" ")[:-1]
 def validate_vulnerability(vuln="*", ):
     pass
-def summarize_response(response):
-    res = {"status":response.status_code, "content":response.text, "headers":response.headers}
+def summarize_response(request, response):
+    writable = "\n## REQUEST\n"+request+"\n## RESPONSE\t"+str(response.status_code)+"\n"+response.text+"\n--\n"
+    res = [{"status":response.status_code, "content":response.text, "headers":response.headers}, writable]
+    return res
 
-def fuzz(payloads, target):
+def fuzz(payloads, target, bbp_header="", tag=""):
     print("Target: ", target, "\n")
     responses = []
     methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"]
     for p in payloads:
-        res = requests.get(target.replace("FUZZ", p), headers={"User-Agent":"Mozilla/5.0 (platform; rv:geckoversion) Gecko/geckotrail Firefox/firefoxversion"})
-        responses.append(summarize_response(res))
-    #for r in responses:
+        res = requests.get(target.replace("FUZZ", p), headers={"User-Agent":"Mozilla/5.0 (platform; rv:geckoversion) "+bbp_header})
+        responses.append(summarize_response(target.replace("FUZZ", p), res))
     return responses
 
 def read_payloads(aux_server="https://eop3vd9wn2wdnv1.m.pipedream.net"):# https://eop3vd9wn2wdnv1.m.pipedream.net is mine
@@ -48,7 +49,7 @@ def read_payloads(aux_server="https://eop3vd9wn2wdnv1.m.pipedream.net"):# https:
     Payloads = {}
     key = ""
     for l in content.split("\n"):
-        if("#" in l):
+        if("#" in l[:1]):
             key = l[1:]
             Payloads[l[1:]]=[]
             continue
@@ -167,23 +168,55 @@ if(not resume2):
 #     menu_wl+=(w+"\n")
         
 print("Proceeding to scan. . .\n\n")
-c = input("Press: \nw\tto change wordlists to be used on discovery mode\np\tto reload payload set from file\nq\tto quit\n[Enter]\tto proceed with the scan.\n\n>>> ")
-if(c=="w"):
-    pass
+p_set = [key for key in default_payloads.keys()]
+c = input("Press: \ns\tto select payloads\np\tto reload payload set from file\nq\tto quit\n[Enter]\tto proceed with the scan.\n\n>>> ")
+if(c=="s"):
+    i = 1
+    print("Payloads categories available:\n\n")
+    for k in default_payloads.keys():
+        print(i, "\t-\t", k)
+        i += 1
+    keys = [key for key in default_payloads.keys()]
+    selection = [int(i)-1 for i in (input("Enter only the categories you want, using the corresponding keys. (x y z)\n\n>> ")).split(" ")]
+    payload_set = []
+    for s in selection:
+        payload_set.append(keys[s])
+    p_set = payload_set
+    # print("Fuzzing selected URLs. . . \n")
+    # for p in p_set:
+    #     for url in extracted:
+    #             print("\n\n")
+    #             print(fuzz(default_payloads[p], url))
+
 elif(c=="p"):
-    pass
+    default_payloads = read_payloads()
 elif(c=="q"):
     sys.exit(1)
-else:
-    if(nuclei_enabled):
-        print("\nRunning nuclei on refined scope. . .\n")
-        print(subprocess.check_output("nuclei -l refined-scope.txt -v -t cves/ -t exposures/ -severity critical,high -headless".split()))
-    print("Fuzzing selected URLs. . . \n")
-    for p in default_payloads:
-        print("Payloads of category\t",p)
-        for url in extracted:
-            print("\n\n")
-            print(fuzz(p, url))
+
+if(nuclei_enabled):
+    print("\nRunning nuclei on refined scope. . .\n")
+    print(subprocess.check_output("nuclei -l refined-scope.txt -v -t cves/ -t exposures/ -severity critical,high -headless".split()))
+print("Fuzzing selected URLs. . . \n")
+
+w_fuzz_results_by_tag = {}
+fuzz_results_by_tag = {}
+writable = ""
+for p in p_set:
+    w_fuzz_results_by_tag[p]=""
+    fuzz_results_by_tag[p]=[]
+    for url in extracted:
+        Fuzz=fuzz(default_payloads[p], url)
+        arr_fuzz = [f[0] for f in Fuzz]
+        w_fuzz = str([f[1] for f in Fuzz])
+        fuzz_results_by_tag[p].append(arr_fuzz)
+        w_fuzz_results_by_tag[p]+=w_fuzz
+        writable += w_fuzz
+
+print("\nWriting to file. . .\n")
+with open("fuzz/fuzzresults", "w") as fuzz_results:
+    fuzz_results.write(writable) 
+    print("\nResults wrote to fuzz/fuzzresults.\n\n")
+fuzz_results.close()
 
         
 '''
