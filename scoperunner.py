@@ -10,37 +10,48 @@ import subprocess
 import sys
 import requests
 
-# def get_stage_command(stage, scope)
-#     commands = ["ffuf -w /usr/share/wordlists/dirbuster/  -u "+url+" -fc 404"]
-#     if(stage=="d"):
-#         return commands[0]
 
-# def run_scope(stages, scope):
-#     # stages can only be one of these: { d, i }
-#     if(type(scope)==str):
-#         pass # treating scope like a str instead of like a list
-#         for s in _stages:
-#         print("Running stage: \n", )
-#         stage(s, scope)
-#     else:
-#         for u in scope:
-#             for s in _stages:
-#                 get_stage_command(s, u)
-#     _stages = stages.split(" ")[:-1]
+def discovery_mode(wildcards):
+    fuzzable = [w.replace("*", "FUZZ") for w in wildcards]
+    #wl_index = wordlists_index()
+    wl_file = open("wordlists/endpoint-discovery", "r")
+    default_wordlist=wl_file.read()
+    wl_file.close()
+    level = int(input("insert a number between 5 and 1000000 to represent the level of discovery.\n\n>> "))
+    wordlist = (default_wordlist.split("\n")[:level])
+    fuzzed = []
+    for d in fuzzable:
+        f = fuzz(wordlist, d, tags="#status:200")
+        fuzzed.append()
+    return fuzzed
+
+
 def validate_vulnerability(vuln="*", ):
     pass
+
 def summarize_response(request, response):
     writable = "\n## REQUEST\n"+request+"\n## RESPONSE\t"+str(response.status_code)+"\n"+response.text+"\n--\n"
-    res = [{"status":response.status_code, "content":response.text, "headers":response.headers}, writable]
+    res = [{"status":int(response.status_code), "content":response.text, "headers":response.headers}, writable]
     return res
 
-def fuzz(payloads, target, bbp_header="", tag=""):
-    print("Target: ", target, "\n")
+def fuzz(payloads, target, bbp_header="", tags=""):
+    scheme = "https://"
+    if("http" in target):
+        scheme = ""
+    Target = scheme+target
+    print("Target: ", Target, "\n")
     responses = []
     methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"]
     for p in payloads:
-        res = requests.get(target.replace("FUZZ", p), headers={"User-Agent":"Mozilla/5.0 (platform; rv:geckoversion) "+bbp_header})
-        responses.append(summarize_response(target.replace("FUZZ", p), res))
+        res = requests.get(Target.replace("FUZZ", p), headers={"User-Agent":"Mozilla/5.0 (platform; rv:geckoversion) "+bbp_header})
+        summarized_res = summarize_response(Target.replace("FUZZ", p), res)
+        if("#status:200" in tags):
+            if(summarized_res[0].status==200):
+                responses.append(summarized_res)
+            else:
+                continue
+        else:
+            responses.append(summarized_res)
     return responses
 
 def read_payloads(aux_server="https://eop3vd9wn2wdnv1.m.pipedream.net"):# https://eop3vd9wn2wdnv1.m.pipedream.net is mine
@@ -63,9 +74,8 @@ def read_payloads(aux_server="https://eop3vd9wn2wdnv1.m.pipedream.net"):# https:
 
 default_payloads = read_payloads()
 
-def wordlists_index():
+def wordlists_index(base = "/usr/share/wordlists/"):
     wordlists = []
-    base = "/usr/share/wordlists/"
     folders = [base+"dirb", base+"wfuzz/vulns", base+"wfuzz/Injections", base+"wfuzz/general", base+"dirbuster"]
     for f in folders:
         print(subprocess.check_output(("bash list-paths.sh "+f).split()))
@@ -81,6 +91,8 @@ urls_by_keyword = {}
 in_urls = [] 
 Extracted = []
 extracted = []
+wildcards = []
+discovered = []
 
 print('''
 scoperunner
@@ -105,6 +117,30 @@ elif(sys.argv[1]=="resume2"):
     resume2 = True
 if(not resume):
     try:
+        
+        super_scope_file = open("scope", "r")
+        ssf_content = super_scope_file.read()
+        if("*" in ssf_content):
+            print("Discovery mode triggered by the scope (*). Setting up subdomain enumeration mode. . .\n\n")
+            old_content = ssf_content.split("\n")[:-1]
+            new_content = ""
+            for l in old_content:
+                if("*" in l):
+                    wildcards.append(l)
+                    continue
+                else:
+                    new_content += (l+"\n")
+            super_scope_file.close()
+            with open("scope", "w") as new_scope_file:
+                if(len(wildcards)>0):
+                    subdomains = discovery_mode(wildcards)
+                    discovered = subdomains
+                    for s in subdomains:
+                        new_content += (s+"\n")
+                    print("Rebuilding scope file . . .\n ")
+                new_scope_file.write(new_content)
+            new_scope_file.close()
+        
         print("Creating dataset file . . .\n")
         print(subprocess.check_output(("bash extract_urls.sh").split()))
     except Exception as e:
@@ -122,6 +158,7 @@ if(not resume2):
         sys.exit(1)
     if(len(in_urls)==0):
         print("No URLs to work on.")
+        sys.exit(1)
     else:
         print("Extracting interesting URLs from ",len(in_urls)," entities . . .")
         for k in keywords:
@@ -134,6 +171,9 @@ if(not resume2):
                     if(u not in extracted):
                         Extracted.append(u)
         extracted = Extracted
+        if(len(extracted)==0):
+            print("No filtering performed.\n")
+
         print(len(in_urls)-len(extracted), " URLs were removed from the source, proceeding to work with ", len(extracted), " URLs.")
         print("stats by keyword: \n")
         print(stats_by_keyword)
@@ -150,6 +190,7 @@ if(not resume2):
                 else:
                     extracted += urls_by_keyword[t]
             extracted = list(set(extracted))
+            extracted += wildcards
         try:
             print("Creating refined scope file. . .\n")
             refined = ""
@@ -162,11 +203,7 @@ if(not resume2):
         except Exception as e:
             print("A problem occured while creating refined-scope.txt file.", e)
             sys.exit(1)
-# menu_wl=""
-# wordlists = wordlists_index()
-# for w in wordlists:
-#     menu_wl+=(w+"\n")
-        
+
 print("Proceeding to scan. . .\n\n")
 p_set = [key for key in default_payloads.keys()]
 c = input("Press: \ns\tto select payloads\np\tto reload payload set from file\nq\tto quit\n[Enter]\tto proceed with the scan.\n\n>>> ")
@@ -182,11 +219,6 @@ if(c=="s"):
     for s in selection:
         payload_set.append(keys[s])
     p_set = payload_set
-    # print("Fuzzing selected URLs. . . \n")
-    # for p in p_set:
-    #     for url in extracted:
-    #             print("\n\n")
-    #             print(fuzz(default_payloads[p], url))
 
 elif(c=="p"):
     default_payloads = read_payloads()
@@ -210,7 +242,7 @@ for p in p_set:
         w_fuzz = str([f[1] for f in Fuzz])
         fuzz_results_by_tag[p].append(arr_fuzz)
         w_fuzz_results_by_tag[p]+=w_fuzz
-        writable += w_fuzz
+        writable += (w_fuzz+"\n\n")
 
 print("\nWriting to file. . .\n")
 with open("fuzz/fuzzresults", "w") as fuzz_results:
