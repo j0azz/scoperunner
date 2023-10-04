@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 if [ $# -eq 0 ]; then
     paramspider -l scope
     cat results/* >> selected-urls.txt;

@@ -9,8 +9,18 @@ with <3 from j0azz
 import subprocess
 import sys
 import requests
+import time
 
+# def initialize():
+#     try:
+#         subprocess.check_output("rmdir -rf results fuzz")
+#         subprocess.check_output("rm *.txt")
+#         subprocess.check_output("mkdir results")
+#         subprocess.check_output("mkdir fuzz")
+#     except Exception as e:
+#         print(e)
 
+    
 def discovery_mode(wildcards):
     fuzzable = [w.replace("*", "FUZZ") for w in wildcards]
     #wl_index = wordlists_index()
@@ -21,8 +31,13 @@ def discovery_mode(wildcards):
     wordlist = (default_wordlist.split("\n")[:level])
     fuzzed = []
     for d in fuzzable:
-        f = fuzz(wordlist, d, tags="#status:200")
-        fuzzed.append()
+        for w in wordlist:
+            time.sleep(2)
+            req = requests.get("https://"+d.replace("FUZZ", w))
+            if(req.status_code is not 404):
+                res = summarize_response(d, req)
+                fuzzed.append(res)
+                print(res[0]["status"])
     return fuzzed
 
 
@@ -30,7 +45,7 @@ def validate_vulnerability(vuln="*", ):
     pass
 
 def summarize_response(request, response):
-    writable = "\n## REQUEST\n"+request+"\n## RESPONSE\t"+str(response.status_code)+"\n"+response.text+"\n--\n"
+    writable = "## REQUEST "+"\n"+request+"\n"+"## RESPONSE:"+str(response.status_code)+"\n"+response.text+"\n--\n"
     res = [{"status":int(response.status_code), "content":response.text, "headers":response.headers}, writable]
     return res
 
@@ -46,7 +61,7 @@ def fuzz(payloads, target, bbp_header="", tags=""):
         res = requests.get(Target.replace("FUZZ", p), headers={"User-Agent":"Mozilla/5.0 (platform; rv:geckoversion) "+bbp_header})
         summarized_res = summarize_response(Target.replace("FUZZ", p), res)
         if("#status:200" in tags):
-            if(summarized_res[0].status==200):
+            if(summarized_res[0]["status"]==200):
                 responses.append(summarized_res)
             else:
                 continue
@@ -94,6 +109,7 @@ extracted = []
 wildcards = []
 discovered = []
 
+# initialize()
 print('''
 scoperunner
 
@@ -105,7 +121,6 @@ print("\n\tUsage: python scoperunner.py [resume, resume2, -nuclei]\nwhere 'scope
 resume = False
 resume2 = False
 nuclei_enabled = "-nuclei" in sys.argv
-
 if(len(sys.argv)<2):
     pass
 elif(sys.argv[1]=="resume"):
